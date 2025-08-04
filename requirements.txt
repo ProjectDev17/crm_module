@@ -1,0 +1,7 @@
+pymongo[srv]>=4.7
+certifi
+PyJWT
+python-dotenv
+cryptography
+certifi
+uuid6

@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.13
+    MemorySize: 256
+
+Resources:
+
+  MyHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: Prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+
+  TemplatesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: app.lambda_handler
+
+      # VPC Config: agrega aquí los IDs reales
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0fd7872302cbb174e
+        SubnetIds:
+          - subnet-097bb1e52a3a63709
+
+      Environment:
+        Variables:
+          MONGODB_DB_NAME: "db_vinks_templates"
+          JWT_SECRET: "46ae6e4f0vatkjkj0hfsm15sqt"
+          JWT_ALGORITHM: "HS256"
+          MONGODB_URI: "mongodb+srv://db_vinks_integrations:KLJP9B6lfonqeu9O@cluster-vinks-red.lntwg7s.mongodb.net/dbname?retryWrites=true&w=majority&tls=true"
+          COGNITO_USER_POOL_ID: "us-east-1_al4SS3KMZ"
+          COGNITO_APP_CLIENT_ID: "46ae6e4f0vatkjkj0hfsm15sqt"
+      Events:
+        GetTemplates:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyHttpApi
+            Path: /
+            Method: GET
+        GetTemplatesById:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyHttpApi
+            Path: /{id}
+            Method: GET
+        CreateTemplate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyHttpApi
+            Path: /
+            Method: POST
+        UpdateTemplate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyHttpApi
+            Path: /{id}
+            Method: PUT
+        DeleteTemplate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyHttpApi
+            Path: /{id}
+            Method: DELETE
+        # Public Create Template
+        PublicCreateTemplate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MyHttpApi
+            Path: /public
+            Method: POST
+
+
+
+Outputs:
+  # URL para invocar el endpoint GET /templates
+  TemplatesApiUrl:
+    Description: "Invoke URL para el recurso /templates"
+    Value: !Sub
+      - "https://${ApiId}.execute-api.${Region}.amazonaws.com/${StageName}/templates"
+      - ApiId: !Ref MyHttpApi
+        Region: !Ref AWS::Region
+        StageName: Prod
