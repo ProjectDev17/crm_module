@@ -8,6 +8,8 @@ from handlers.handle_get    import lambda_handler as handle_get
 from handlers.handle_post   import lambda_handler as handle_post
 from handlers.handle_put    import lambda_handler as handle_put
 from handlers.handle_delete import lambda_handler as handle_delete
+from handlers_pubilc.handle_post import lambda_handler as public_handle_post
+from handlers.handle_onboarding import lambda_handler as handle_onboarding
 
 def lambda_handler(event, context):
     db_name = os.getenv("MONGODB_DB_NAME")
@@ -31,17 +33,23 @@ def lambda_handler(event, context):
                         "error": f"Método {method} no soportado para la ruta {path}"
                     })
                 }
-        if method == "GET":
-            return handle_get(event, context)
+        elif "/onboarding" in path:
+            if method == "POST":
+                return handle_onboarding(event, context)
+        elif "/modules" in path:
+            if method == "GET":
+                return handle_get(event, context)
 
-        elif method == "POST":
-            return handle_post(event, context)
+            elif method == "POST":
+                return handle_post(event, context)
 
-        elif method == "PUT":
-            return put_handler(event, context)
+            elif method == "PUT":
+                return put_handler(event, context)
 
-        elif method == "DELETE":
-            return delete_handler(event, context)
+            elif method == "DELETE":
+                return delete_handler(event, context)
+
+        
         
         return _response(405, {"error": f"Método {method} no soportado para {path}"})
 
