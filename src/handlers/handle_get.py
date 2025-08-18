@@ -8,7 +8,7 @@ from middleware.auth_middleware import auth_middleware
 @auth_middleware
 def lambda_handler(event, context):
     """
-    Lógica para GET /templates o GET /templates/{id}.
+    Lógica para GET /modules o GET /modules/{id}.
     - Si se pasa {id}, devuelve un solo documento (si deleted == false).
     - Si no se pasa, devuelve todos los no eliminados (deleted == false).
     """
@@ -24,7 +24,7 @@ def lambda_handler(event, context):
         except ServerSelectionTimeoutError as err:
             return _response(502, {"error": f"No se pudo conectar a MongoDB: {err}"})
         
-        template_id = event.get("pathParameters", {}).get("id")
+        module_id = event.get("pathParameters", {}).get("id")
         table_name = event.get("queryStringParameters", {}).get("table_name")
         #valida si viene el table_name
         if not table_name:
@@ -35,10 +35,10 @@ def lambda_handler(event, context):
 
         collection = db[table_name]
 
-        # 🔹 GET /templates/{id}
-        if template_id:
+        # 🔹 GET /modules/{id}
+        if module_id:
             try:
-                doc = collection.find_one({"_id": template_id, "deleted": False})
+                doc = collection.find_one({"_id": module_id, "deleted": False})
                 if not doc:
                     return _response(404, {"error": "Documento no encontrado o fue eliminado"})
 
@@ -50,7 +50,7 @@ def lambda_handler(event, context):
             except Exception as e:
                 return _response(400, {"error": f"Error al buscar el documento: {str(e)}"})
 
-        # 🔹 GET /templates
+        # 🔹 GET /modules
         items_cursor = collection.find({"deleted": False})
         items = []
         for doc in items_cursor:
@@ -72,7 +72,6 @@ def lambda_handler(event, context):
 
 
 def _normalize_doc(doc):
-    """Convierte ObjectId y timestamps para serialización JSON."""
     doc["_id"] = str(doc["_id"])
     if "created_at" in doc:
         doc["created_at"] = (
