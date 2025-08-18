@@ -1,86 +1,93 @@
-# src/middleware/auth_middleware.py
-
+# middleware/auth_middleware.py
 import os
 import json
-import logging
-import jwt
-import urllib.request
-from jwt import ExpiredSignatureError, InvalidTokenError
-from functools import wraps
+from typing import Any, Callable, Dict
+from services.token_service import decode_token
+from services.db import get_database
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+try:
+    from bson import ObjectId
+except Exception:
+    ObjectId = None  # si no está en la layer, no rompemos
 
-# Cargamos el JWKS local si lo estás usando, o configuramos el PyJWKClient
-_JWKS_CLIENT = None
-_COGNITO_ISSUER = None
+def _get_header(headers: Dict[str, str], name: str, default: str = "") -> str:
+    if not isinstance(headers, dict):
+        return default
+    # maneja mayúsculas/minúsculas de API Gateway/ALB
+    return headers.get(name) or headers.get(name.lower()) or headers.get(name.capitalize()) or default
 
-def _initialize_jwks_client():
-    global _JWKS_CLIENT, _COGNITO_ISSUER
+def authenticate_request(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Valida el token y retorna {'statusCode': 200, 'user_id': ..., 'user_data': ...} o un error."""
+    headers = event.get("headers", {}) if isinstance(event, dict) else {}
+    auth_header = _get_header(headers, "authorization", "")
 
-    region = os.getenv("AWS_REGION")
-    user_pool_id = os.getenv("COGNITO_USER_POOL_ID")
-    logger.info(f"[auth] Inicializando JWKS Client con AWS_REGION={region} y COGNITO_USER_POOL_ID={user_pool_id}")
-    if not region or not user_pool_id:
-        raise RuntimeError("Debes definir AWS_REGION y COGNITO_USER_POOL_ID en el entorno")
+    if not auth_header.startswith("Bearer "):
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid token format"})}
 
-    issuer = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
-    jwks_url = f"{issuer}/.well-known/jwks.json"
-    logger.info(f"[auth] JWKS URL: {jwks_url}")
+    access_token = auth_header.split(" ", 1)[1].strip()
+    if not access_token:
+        return {"statusCode": 400, "body": json.dumps({"error": "Missing access token"})}
 
-    _JWKS_CLIENT = jwt.PyJWKClient(jwks_url)
-    _COGNITO_ISSUER = issuer
+    decoded_token = decode_token(access_token)
+    if not decoded_token:
+        return {"statusCode": 401, "body": json.dumps({"error": "Invalid access token"})}
+    if isinstance(decoded_token, dict) and "statusCode" in decoded_token and decoded_token["statusCode"] != 200:
+        # si tu decode_token ya devuelve errores con statusCode
+        return decoded_token
 
-def auth_middleware(func):
-    @wraps(func)
-    def wrapper(event, context, *args, **kwargs):
-        try:
-            # Inicializar cliente JWKS si no existe
-            global _JWKS_CLIENT, _COGNITO_ISSUER
-            if _JWKS_CLIENT is None:
-                _initialize_jwks_client()
+    # intenta obtener el user_id con distintos esquemas de payload
+    user_id = (
+        (decoded_token.get("user") or {}).get("_id")
+        if isinstance(decoded_token, dict) else None
+    ) or (decoded_token.get("sub") if isinstance(decoded_token, dict) else None)
 
-            headers = event.get("headers") or {}
-            auth_header = headers.get("Authorization") or headers.get("authorization")
-            logger.info(f"[auth] Headers recibidos: {headers.keys()}")
-            if not auth_header:
-                logger.warning("[auth] Falta header Authorization")
-                return {"statusCode": 401, "body": json.dumps({"message": "Authorization header missing"})}
+    if not user_id:
+        return {"statusCode": 401, "body": json.dumps({"error": "Invalid token: missing user_id"})}
 
-            parts = auth_header.split()
-            if len(parts) != 2 or parts[0].lower() != "bearer":
-                logger.warning(f"[auth] Formato inválido de Authorization header: {auth_header}")
-                return {"statusCode": 401, "body": json.dumps({"message": "Invalid Authorization header format"})}
+    # db_name desde el evento o variable de entorno
+    db_name = (event.get("db_name") if isinstance(event, dict) else None) or os.getenv("MONGODB_DB_NAME")
+    if not db_name:
+        return {"statusCode": 500, "body": json.dumps({"error": "Missing DB name (MONGODB_DB_NAME)"})}
 
-            token = parts[1]
-            logger.info(f"[auth] Token recibido (truncado): {token[:10]}...")
+    db = get_database(db_name)
+    users = db["users"]
 
-            # Intentar obtener la clave pública y decodificar
-            signing_key = _JWKS_CLIENT.get_signing_key_from_jwt(token).key
-            logger.info("[auth] Clave pública obtenida; procediendo a decodificar JWT")
+    # si el _id es ObjectId válido, úsalo; si no, búscalo como string
+    query_id = None
+    if ObjectId and isinstance(user_id, str) and ObjectId.is_valid(user_id):
+        query_id = ObjectId(user_id)
+    else:
+        query_id = user_id
 
-            decoded = jwt.decode(
-                token,
-                signing_key,
-                algorithms=["RS256"],
-                issuer=_COGNITO_ISSUER
-            )
-            logger.info(f"[auth] JWT decodificado con éxito. Claims: {list(decoded.keys())}")
+    user_data = users.find_one({"_id": query_id})
+    if not user_data:
+        return {"statusCode": 404, "body": json.dumps({"error": "User not found"})}
 
-            # Inyectar claims en event
-            event["requestContext"] = event.get("requestContext", {})
-            event["requestContext"]["authorizer"] = decoded
-            return func(event, context, *args, **kwargs)
+    # valida que el token corresponda al actual guardado
+    current_access_token = user_data.get("current_access_token")
+    if not current_access_token or access_token != current_access_token:
+        return {"statusCode": 401, "body": json.dumps({"error": "Invalid token"})}
 
-        except ExpiredSignatureError:
-            logger.warning("[auth] Token expirado")
-            return {"statusCode": 401, "body": json.dumps({"message": "Token expired"})}
-        except InvalidTokenError as e:
-            logger.warning(f"[auth] Token inválido: {str(e)}")
-            return {"statusCode": 401, "body": json.dumps({"message": f"Invalid token: {str(e)}"})}
-        except Exception as e:
-            # Loguear el stack completo para ver la causa exacta
-            logger.error("[auth] Error inesperado validando JWT", exc_info=True)
-            return {"statusCode": 500, "body": json.dumps({"message": f"Error validating token: {str(e)}"})}
+    return {
+        "statusCode": 200,
+        "user_id": str(user_data.get("_id")),
+        "user_data": user_data,  # si es sensible, evita devolver todo
+        "access_token": access_token,
+    }
 
+def auth_middleware(handler: Callable[[Dict[str, Any], Any], Dict[str, Any]]):
+    """Decorador correcto: valida y, si todo ok, inyecta auth_result en event."""
+    def wrapper(event: Dict[str, Any], context: Any, *args, **kwargs):
+        result = authenticate_request(event)
+        if not isinstance(result, dict) or result.get("statusCode") != 200:
+            # retorna el error tal cual
+            return result
+
+        # inyecta auth_result al event para uso posterior
+        if not isinstance(event, dict):
+            new_event = {}
+        else:
+            new_event = dict(event)  # copia superficial
+        new_event["auth_result"] = result
+        return handler(new_event, context, *args, **kwargs)
     return wrapper

@@ -6,12 +6,12 @@ import json
 
 
 # 2) Importa tus sub‐handlers
-from src.handlers.handle_get    import lambda_handler as get_handler
-from src.handlers.handle_post   import lambda_handler as post_handler
-from src.handlers.handle_put    import lambda_handler as put_handler
-from src.handlers.handle_delete import lambda_handler as delete_handler
+from handlers.handle_get    import lambda_handler as get_handler
+from handlers.handle_post   import lambda_handler as post_handler
+from handlers.handle_put    import lambda_handler as put_handler
+from handlers.handle_delete import lambda_handler as delete_handler
 
-from src.handlers_pubilc.handle_post import lambda_handler as public_post_handler
+from handlers_pubilc.handle_post import lambda_handler as public_post_handler
 
 def lambda_handler(event, context):
     """

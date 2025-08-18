@@ -2,7 +2,7 @@ import json
 from uuid6 import uuid6
 from datetime import datetime
 
-from src.services.db import get_database
+from services.db import get_database
 
 def lambda_handler(event, context):
     """

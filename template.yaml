@@ -1,98 +1,84 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
+###############################################################################
+# GLOBALS
+###############################################################################
 Globals:
   Function:
+    Runtime: python3.12
     Timeout: 10
-    Runtime: python3.13
     MemorySize: 256
+    Layers:
+      - arn:aws:lambda:us-east-1:195275634967:layer:common-utils-py312:2
+    Environment:
+      Variables:
+        JWT_SECRET: "dev_secret"
+        JWT_ALGORITHM: "HS256"
+        MONGODB_DB_NAME: "crm"
+        MONGODB_URI: "mongodb+srv://crm:sCEVRRjfDzUi8Ve7@crm.oeswogj.mongodb.net/crm?retryWrites=true&w=majority&tls=true"
 
+###############################################################################
+# API HTTP
+###############################################################################
 Resources:
 
-  MyHttpApi:
+  HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: Prod
       CorsConfiguration:
-        AllowOrigins:
-          - "*"
-        AllowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-        AllowHeaders:
-          - Content-Type
-          - Authorization
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, PUT, DELETE, OPTIONS]
+        AllowHeaders: [Content-Type, Authorization]
 
-  TemplatesFunction:
+  #############################################################################
+  # FUNCIÓN PRINCIPAL (APP)
+  #############################################################################
+  ModuleFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
+      CodeUri: src/
       Handler: app.lambda_handler
-
-      # VPC Config: agrega aquí los IDs reales
-      VpcConfig:
-        SecurityGroupIds:
-          - sg-0fd7872302cbb174e
-        SubnetIds:
-          - subnet-097bb1e52a3a63709
-
-      Environment:
-        Variables:
-          MONGODB_DB_NAME: "db_vinks_templates"
-          JWT_SECRET: "46ae6e4f0vatkjkj0hfsm15sqt"
-          JWT_ALGORITHM: "HS256"
-          MONGODB_URI: "mongodb+srv://db_vinks_integrations:KLJP9B6lfonqeu9O@cluster-vinks-red.lntwg7s.mongodb.net/dbname?retryWrites=true&w=majority&tls=true"
-          COGNITO_USER_POOL_ID: "us-east-1_al4SS3KMZ"
-          COGNITO_APP_CLIENT_ID: "46ae6e4f0vatkjkj0hfsm15sqt"
       Events:
-        GetTemplates:
+        GetModules:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
-            Path: /
+            ApiId: !Ref HttpApi
+            Path: /modules
             Method: GET
-        GetTemplatesById:
+        GetModulesById:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
-            Path: /{id}
+            ApiId: !Ref HttpApi
+            Path: /modules/{id}
             Method: GET
-        CreateTemplate:
+        CreateModule:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
-            Path: /
+            ApiId: !Ref HttpApi
+            Path: /modules
             Method: POST
-        UpdateTemplate:
+        UpdateModule:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
-            Path: /{id}
+            ApiId: !Ref HttpApi
+            Path: /modules/{id}
             Method: PUT
-        DeleteTemplate:
+        DeleteModule:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
-            Path: /{id}
+            ApiId: !Ref HttpApi
+            Path: /modules/{id}
             Method: DELETE
-        # Public Create Template
-        PublicCreateTemplate:
+        PublicCreateModule:
           Type: HttpApi
           Properties:
-            ApiId: !Ref MyHttpApi
-            Path: /public
+            ApiId: !Ref HttpApi
+            Path: /modules/public
             Method: POST
-
-
 
 Outputs:
-  # URL para invocar el endpoint GET /templates
-  TemplatesApiUrl:
-    Description: "Invoke URL para el recurso /templates"
-    Value: !Sub
-      - "https://${ApiId}.execute-api.${Region}.amazonaws.com/${StageName}/templates"
-      - ApiId: !Ref MyHttpApi
-        Region: !Ref AWS::Region
-        StageName: Prod
+  ApiBaseUrl:
+    Description: "Base URL de la API (stage Prod)"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"

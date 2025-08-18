@@ -2,8 +2,8 @@ import json
 from uuid6 import uuid6
 from datetime import datetime
 
-from src.services.db import get_database
-from src.middleware.auth_middleware import auth_middleware
+from services.db import get_database
+from middleware.auth_middleware import auth_middleware
 
 @auth_middleware
 def lambda_handler(event, context):
@@ -39,7 +39,6 @@ def lambda_handler(event, context):
         user_data = auth_result.get("user_data", {})
 
         created_by_user = user_data.get("sub") or "unknown"
-        id_client = user_data.get("client_id") or "unknown"
 
         now_ts = int(datetime.now().timestamp())
         generated_id = str(uuid6())
@@ -48,15 +47,12 @@ def lambda_handler(event, context):
         new_item = {
             **body,
             "_id": generated_id,
-            "id_client": id_client,           
-            "_cls": "Template",
             "created_at": now_ts,
             "created_by": created_by_user,
             "updated_at": now_ts,
             "updated_by": created_by_user,
             "deleted": False,
             "status": True,
-            "global_key": global_key_str
         }
 
         collection.insert_one(new_item)

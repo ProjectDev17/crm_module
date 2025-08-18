@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
-from src.services.db import get_database
-from src.middleware.auth_middleware import auth_middleware
+from services.db import get_database
+from middleware.auth_middleware import auth_middleware
 
 @auth_middleware
 def lambda_handler(event, context):

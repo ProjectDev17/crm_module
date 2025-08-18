@@ -1,8 +1,9 @@
+# handlers/handle_get.py
 import os
 import json
-from src.services.db import get_database
+from services.db import get_database
 from pymongo.errors import ServerSelectionTimeoutError
-from src.middleware.auth_middleware import auth_middleware
+from middleware.auth_middleware import auth_middleware
 
 @auth_middleware
 def lambda_handler(event, context):
