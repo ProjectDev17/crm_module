@@ -92,21 +92,6 @@ def lambda_handler(event, context):
     """
     POST /onboarding
     Crea el tenant a partir de la información básica de la empresa en Colombia.
-    Body esperado (JSON):
-    {
-      "company": {
-        "name": "Sonrisa Dental IPS",
-        "nit": "900123456-7",      // se acepta con o sin guion
-        "dv": 7,                   // opcional, si no viene se calcula
-        "email": "info@...",
-        "phone": "+57 3001234567",
-        "address": "Cra 10 # 20-30",
-        "city": "Medellín",
-        "department": "Antioquia", // opcional
-        "country": "CO"            // por defecto "CO"
-      }
-    }
-    Respuesta: tenant creado o retornado (idempotente).
     """
     try:
         # Normaliza body

@@ -13,17 +13,10 @@ def lambda_handler(event, context):
     - Toma id_client desde client_id (token)
     """
     try:
-        db_name = event.get("db_name")
-        if not db_name:
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": "No se recibió db_name en el evento"})
-            }
-
         body = json.loads(event.get("body") or "{}")
         table_name = body.get("table_name")
         #valida si viene el table_name
-        if not table_name and table_name!= "templates":
+        if not user_data.get("db_name"):
             return {
                 "statusCode": 400,
                 "body": json.dumps({"error": "Falta el campo 'table_name' en el cuerpo de la solicitud"})

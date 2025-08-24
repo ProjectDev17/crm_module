@@ -12,17 +12,10 @@ from handlers_pubilc.handle_post import lambda_handler as public_handle_post
 from handlers.handle_onboarding import lambda_handler as handle_onboarding
 
 def lambda_handler(event, context):
-    db_name = os.getenv("MONGODB_DB_NAME")
-    if not db_name:
-        return _response(500, {"error": "No se encontró la variable de entorno MONGODB_DB_NAME"})
-
-    event["db_name"] = db_name
-
     method = _get_http_method(event)
     path = _get_path(event)
 
     try:
-        print(f"Processing {method} request for {path}")
         if "/public" in path:
             if method == "POST":
                 return public_handle_post(event, context)
@@ -44,7 +37,7 @@ def lambda_handler(event, context):
                 return handle_post(event, context)
 
             elif method == "PUT":
-                return put_handler(event, context)
+                return handle_put(event, context)
 
             elif method == "DELETE":
                 return delete_handler(event, context)

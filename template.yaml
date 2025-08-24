@@ -10,11 +10,10 @@ Globals:
     Timeout: 10
     MemorySize: 256
     Layers:
-      - arn:aws:lambda:us-east-1:195275634967:layer:common-utils-py312:8
+      - arn:aws:lambda:us-east-1:195275634967:layer:common-utils-py312:9
     Environment:
       Variables:
         JWT_ALGORITHM: "HS256"
-        MONGODB_DB_NAME: "crm"
         MONGODB_URI: "mongodb+srv://crm:sCEVRRjfDzUi8Ve7@crm.oeswogj.mongodb.net/crm?retryWrites=true&w=majority&tls=true"
 
 ###############################################################################
